@@ -1,0 +1,71 @@
+package k8s
+
+import (
+	"context"
+
+	"janusd/internal/store"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+var _ store.SecretStore = (*Store)(nil)
+
+// Store implements store.SecretStore using K8s Secrets as the backend(저장소).
+type Store struct {
+	client kubernetes.Interface
+}
+
+func New(client kubernetes.Interface) *Store {
+	return &Store{client: client}
+}
+
+// Get retrieves a single key from a K8s Secret.
+func (s *Store) Get(ctx context.Context, namespace, name, key string) (string, error) {
+	secret, err := s.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	val, ok := secret.Data[key]
+	if !ok {
+		return "", nil
+	}
+
+	return string(val), nil
+}
+
+// Set creates or updates a K8s Secret with the given data.
+func (s *Store) Set(ctx context.Context, namespace, name string, data map[string]string) error {
+	encoded := make(map[string][]byte, len(data))
+	for k, v := range data {
+		encoded[k] = []byte(v)
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: encoded,
+	}
+
+	_, err := s.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err = s.client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+
+	_, err = s.client.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	return err
+}
+
+// Delete removes a K8s Secret entirely.
+func (s *Store) Delete(ctx context.Context, namespace, name string) error {
+	return s.client.CoreV1().Secrets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}

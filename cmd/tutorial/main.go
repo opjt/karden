@@ -1,17 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
+	k8sstore "janusd/internal/store/k8s"
+
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
-	// 1. kubeconfig 로드 (KUBECONFIG 환경변수 → ~/.kube/config 순서로 자동 탐색)
+	// 1. load kubeconfig
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		loadingRules,
@@ -21,43 +21,43 @@ func main() {
 		panic(err)
 	}
 
-	// 2. 클라이언트 생성
+	// 2. create clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
-	// 3. Informer Factory 생성 (모든 네임스페이스)
-	factory := informers.NewSharedInformerFactory(clientset, 0)
+	store := k8sstore.New(clientset)
+	ctx := context.Background()
 
-	// 4. Pod Informer 생성
-	podInformer := factory.Core().V1().Pods().Informer()
+	namespace := "default"
+	secretName := "janusd-test-secret"
 
-	// 5. 이벤트 핸들러 등록
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			pod := obj.(*corev1.Pod)
-			fmt.Printf("[ADD] %s/%s\n", pod.Namespace, pod.Name)
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			pod := newObj.(*corev1.Pod)
-			fmt.Printf("[UPDATE] %s/%s\n", pod.Namespace, pod.Name)
-		},
-		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*corev1.Pod)
-			fmt.Printf("[DELETE] %s/%s\n", pod.Namespace, pod.Name)
-		},
+	// 3. Set — create a Secret
+	fmt.Println("--- Set ---")
+	err = store.Set(ctx, namespace, secretName, map[string]string{
+		"POSTGRES_USER":     "app_user",
+		"POSTGRES_PASSWORD": "supersecret123",
+		"POSTGRES_DB":       "torchi",
 	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Secret '%s' created\n", secretName)
 
-	// 6. Informer 시작
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	// 4. Get — read a value back
+	fmt.Println("--- Get ---")
+	val, err := store.Get(ctx, namespace, secretName, "POSTGRES_PASSWORD")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("POSTGRES_PASSWORD = %s\n", val)
 
-	factory.Start(stopCh)
-	factory.WaitForCacheSync(stopCh)
-
-	fmt.Println("Pod watching 시작...")
-
-	// 7. 종료 대기
-	<-stopCh
+	// 5. Delete — remove the Secret
+	fmt.Println("--- Delete ---")
+	err = store.Delete(ctx, namespace, secretName)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Secret '%s' deleted\n", secretName)
 }
