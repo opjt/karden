@@ -67,7 +67,7 @@ func (s *SecretStore) Delete(ctx context.Context, namespace, name string) error 
 	return s.client.CoreV1().Secrets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
-func (s *SecretStore) GetSecretData(ctx context.Context, namespace, name string) (map[string]string, error) {
+func (s *SecretStore) GetData(ctx context.Context, namespace, name string) (map[string]string, error) {
 	secret, err := s.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ import (
 	"karden/internal/adapter/k8s"
 	"karden/internal/adapter/sqlite"
 	"karden/internal/api"
+	"karden/internal/domain/workload"
 	"karden/internal/pkg/config"
 	"karden/internal/watcher"
 
@@ -69,6 +70,7 @@ func run(ctx context.Context, env config.Env) error {
 
 	store := k8s.NewSecretStore(clientset)
 	repo := sqlite.NewWorkloadRepository(db)
+	secretSvc := workload.NewService(repo, store)
 
 	// watcher start
 	w := watcher.New(clientset, store, repo)
@@ -77,7 +79,7 @@ func run(ctx context.Context, env config.Env) error {
 	// HTTP server
 	addr := fmt.Sprintf(":%d", env.Port)
 
-	handler := api.NewHandler(repo, store)
+	handler := api.NewHandler(secretSvc)
 	srv := api.NewServer(addr, handler)
 
 	errChan := make(chan error, 1)

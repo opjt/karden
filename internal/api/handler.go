@@ -1,21 +1,19 @@
 package api
 
 import (
-	"karden/internal/adapter/k8s"
 	"karden/internal/domain/workload"
 	"net/http"
 )
 
 type Handler struct {
-	repo  workload.Repository
-	store *k8s.SecretStore
+	secretSvc workload.Service
 }
 
-func NewHandler(repo workload.Repository, store *k8s.SecretStore) *Handler {
-	return &Handler{repo: repo, store: store}
+func NewHandler(secretSvc workload.Service) *Handler {
+	return &Handler{secretSvc: secretSvc}
 }
 
-// secretResponse is the API shape for a managed secret.
+// secretResponse is the API DTO for a managed secret.
 type secretResponse struct {
 	Name          string            `json:"name"`
 	Namespace     string            `json:"namespace"`
@@ -28,44 +26,37 @@ type secretResponse struct {
 	Data          map[string]string `json:"data,omitempty"`
 }
 
+func toResponse(v *workload.SecretView) *secretResponse {
+	var lastRotatedAt *string
+	if v.LastRotatedAt != nil {
+		s := v.LastRotatedAt.UTC().Format("2006-01-02T15:04:05Z")
+		lastRotatedAt = &s
+	}
+	return &secretResponse{
+		Name:          v.Name,
+		Namespace:     v.Namespace,
+		Type:          string(v.Type),
+		DBType:        string(v.DBType),
+		RotationDays:  v.RotationDays,
+		LastRotatedAt: lastRotatedAt,
+		Status:        string(v.Status),
+		Pods:          v.Pods,
+		Data:          v.Data,
+	}
+}
+
 // GET /api/v1/secrets
 func (h *Handler) listSecrets(w http.ResponseWriter, r *http.Request) {
-	workloads, err := h.repo.List(r.Context())
+	secrets, err := h.secretSvc.List(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list workloads")
+		writeError(w, http.StatusInternalServerError, "failed to list secrets")
 		return
 	}
 
-	type key struct{ name, namespace string }
-	index := map[key]*secretResponse{}
-
-	for _, wl := range workloads {
-		k := key{wl.SecretName, wl.Namespace}
-		if _, ok := index[k]; !ok {
-			var lastRotatedAt *string
-			if wl.LastRotatedAt != nil {
-				s := wl.LastRotatedAt.UTC().Format("2006-01-02T15:04:05Z")
-				lastRotatedAt = &s
-			}
-			index[k] = &secretResponse{
-				Name:          wl.SecretName,
-				Namespace:     wl.Namespace,
-				Type:          string(wl.Type),
-				DBType:        string(wl.DBType),
-				RotationDays:  wl.RotationDays,
-				LastRotatedAt: lastRotatedAt,
-				Status:        string(wl.Status),
-				Pods:          []string{},
-			}
-		}
-		index[k].Pods = append(index[k].Pods, wl.PodName)
+	result := make([]*secretResponse, len(secrets))
+	for i, s := range secrets {
+		result[i] = toResponse(s)
 	}
-
-	result := make([]*secretResponse, 0, len(index))
-	for _, v := range index {
-		result = append(result, v)
-	}
-
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -74,53 +65,21 @@ func (h *Handler) getSecret(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
 	name := r.PathValue("name")
 
-	workloads, err := h.repo.List(r.Context())
+	secret, err := h.secretSvc.Get(r.Context(), namespace, name)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list workloads")
+		writeError(w, http.StatusInternalServerError, "failed to get secret")
 		return
 	}
-
-	var resp *secretResponse
-	for _, wl := range workloads {
-		if wl.SecretName != name || wl.Namespace != namespace {
-			continue
-		}
-		if resp == nil {
-			var lastRotatedAt *string
-			if wl.LastRotatedAt != nil {
-				s := wl.LastRotatedAt.UTC().Format("2006-01-02T15:04:05Z")
-				lastRotatedAt = &s
-			}
-			resp = &secretResponse{
-				Name:          wl.SecretName,
-				Namespace:     wl.Namespace,
-				Type:          string(wl.Type),
-				DBType:        string(wl.DBType),
-				RotationDays:  wl.RotationDays,
-				LastRotatedAt: lastRotatedAt,
-				Status:        string(wl.Status),
-				Pods:          []string{},
-			}
-		}
-		resp.Pods = append(resp.Pods, wl.PodName)
-	}
-
-	if resp == nil {
+	if secret == nil {
 		writeError(w, http.StatusNotFound, "secret not found")
 		return
 	}
 
-	// K8s에서 실제 data 조회
-	data, err := h.store.GetSecretData(r.Context(), namespace, name)
-	if err == nil {
-		resp.Data = data
-	}
-
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, toResponse(secret))
 }
 
 // POST /api/v1/secrets/{namespace}/{name}/rotate
 func (h *Handler) rotateSecret(w http.ResponseWriter, r *http.Request) {
-	// TODO: rotation login implement
+	// TODO: implement rotation logic
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "rotation triggered"})
 }
