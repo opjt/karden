@@ -1,8 +1,7 @@
-package domain
+package workload
 
 import "time"
 
-// Type represents what kind of secret Janusd manages
 type Type string
 
 const (
@@ -11,16 +10,15 @@ const (
 	TypeManual   Type = "manual"
 )
 
-// DBType represents the database engine
 type DBType string
 
 const (
 	DBTypeMySQL    DBType = "mysql"
 	DBTypePostgres DBType = "postgres"
 	DBTypeMongoDB  DBType = "mongodb"
+	DBTypeRedis    DBType = "redis"
 )
 
-// Status represents whether a target is being actively managed
 type Status string
 
 const (
@@ -28,8 +26,8 @@ const (
 	StatusInactive Status = "inactive"
 )
 
-// ManagedTarget is a Pod that Janusd is managing
-type ManagedTarget struct {
+// ManagedWorkload is a Pod whose secret lifecycle is managed by Karden.
+type ManagedWorkload struct {
 	ID            int
 	PodName       string
 	Namespace     string
@@ -43,3 +41,4 @@ type ManagedTarget struct {
 	Status        Status
 	CreatedAt     time.Time
 }
+

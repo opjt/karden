@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	k8sstore "karden/internal/store/k8s"
+	"karden/internal/adapter/k8s"
 	"karden/internal/watcher"
 
 	"k8s.io/client-go/kubernetes"
@@ -39,7 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	store := k8sstore.New(clientset)
+	store := k8s.NewSecretStore(clientset)
 	w := watcher.New(clientset, store)
 
 	w.Start()

@@ -5,8 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"karden/internal/domain"
-	"karden/internal/store"
+	"karden/internal/domain/workload"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
@@ -16,11 +15,11 @@ import (
 
 type Watcher struct {
 	client kubernetes.Interface
-	store  store.SecretStore
+	store  workload.SecretStore
 	stopCh chan struct{}
 }
 
-func New(client kubernetes.Interface, store store.SecretStore) *Watcher {
+func New(client kubernetes.Interface, store workload.SecretStore) *Watcher {
 	return &Watcher{
 		client: client,
 		store:  store,
@@ -59,23 +58,23 @@ func (w *Watcher) handlePod(pod *corev1.Pod) {
 		return
 	}
 
-	target := parseTarget(pod)
-	if target == nil {
+	t := parseTarget(pod)
+	if t == nil {
 		return
 	}
 
 	slog.Info("detected managed pod",
 		"namespace", pod.Namespace,
 		"pod", pod.Name,
-		"secret", target.SecretName,
+		"secret", t.SecretName,
 	)
 
-	w.ensureSecret(context.Background(), target)
+	w.ensureSecret(context.Background(), t)
 }
 
-// parseTarget extracts a ManagedTarget from pod annotations.
+// parseTarget extracts a ManagedWorkload from pod annotations.
 // Returns nil if required annotations are missing.
-func parseTarget(pod *corev1.Pod) *domain.ManagedTarget {
+func parseTarget(pod *corev1.Pod) *workload.ManagedWorkload {
 	ann := pod.Annotations
 
 	secretName := ann[AnnotationSecretName]
@@ -95,73 +94,73 @@ func parseTarget(pod *corev1.Pod) *domain.ManagedTarget {
 		}
 	}
 
-	dbPort := defaultDBPort(domain.DBType(ann[AnnotationDBType]))
+	dbPort := defaultDBPort(workload.DBType(ann[AnnotationDBType]))
 	if v := ann[AnnotationDBPort]; v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			dbPort = n
 		}
 	}
 
-	return &domain.ManagedTarget{
+	return &workload.ManagedWorkload{
 		PodName:      pod.Name,
 		Namespace:    pod.Namespace,
 		SecretName:   secretName,
-		Type:         domain.Type(ann[AnnotationType]),
-		DBType:       domain.DBType(ann[AnnotationDBType]),
+		Type:         workload.Type(ann[AnnotationType]),
+		DBType:       workload.DBType(ann[AnnotationDBType]),
 		DBHost:       ann[AnnotationDBHost],
 		DBPort:       dbPort,
 		RotationDays: rotationDays,
-		Status:       domain.StatusActive,
+		Status:       workload.StatusActive,
 	}
 }
 
 // ensureSecret creates the Secret if it doesn't exist yet.
-func (w *Watcher) ensureSecret(ctx context.Context, target *domain.ManagedTarget) {
-	existing, err := w.store.Get(ctx, target.Namespace, target.SecretName, "")
+func (w *Watcher) ensureSecret(ctx context.Context, t *workload.ManagedWorkload) {
+	existing, err := w.store.Get(ctx, t.Namespace, t.SecretName, "")
 	if err == nil && existing != "" {
 		slog.Info("secret already exists, skipping",
-			"secret", target.SecretName,
+			"secret", t.SecretName,
 		)
 		return
 	}
 
-	data := buildSecretData(target)
-	if err := w.store.Set(ctx, target.Namespace, target.SecretName, data); err != nil {
+	data := buildSecretData(t)
+	if err := w.store.Set(ctx, t.Namespace, t.SecretName, data); err != nil {
 		slog.Error("failed to create secret",
-			"secret", target.SecretName,
+			"secret", t.SecretName,
 			"err", err,
 		)
 		return
 	}
 
 	slog.Info("secret created",
-		"secret", target.SecretName,
-		"namespace", target.Namespace,
+		"secret", t.SecretName,
+		"namespace", t.Namespace,
 	)
 }
 
 // buildSecretData generates initial secret values based on type.
-func buildSecretData(target *domain.ManagedTarget) map[string]string {
-	switch target.Type {
-	case domain.TypeDatabase:
-		return buildDBSecretData(target)
+func buildSecretData(t *workload.ManagedWorkload) map[string]string {
+	switch t.Type {
+	case workload.TypeDatabase:
+		return buildDBSecretData(t)
 	default:
 		return map[string]string{}
 	}
 }
 
-func buildDBSecretData(target *domain.ManagedTarget) map[string]string {
-	username := buildUsername(target.SecretName)
+func buildDBSecretData(t *workload.ManagedWorkload) map[string]string {
+	username := buildUsername(t.SecretName)
 	password := generatePassword()
 
-	switch target.DBType {
-	case domain.DBTypePostgres:
+	switch t.DBType {
+	case workload.DBTypePostgres:
 		return map[string]string{
 			"POSTGRES_USER":     username,
 			"POSTGRES_PASSWORD": password,
 			"POSTGRES_DB":       "app",
 		}
-	case domain.DBTypeMySQL:
+	case workload.DBTypeMySQL:
 		return map[string]string{
 			"MYSQL_USER":          username,
 			"MYSQL_PASSWORD":      password,

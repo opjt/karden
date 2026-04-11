@@ -1,8 +1,7 @@
 package watcher
 
-import "karden/internal/domain"
+import "karden/internal/domain/workload"
 
-// Annotation keys that Janusd reads from Pods
 const (
 	AnnotationInject       = "karden.io/inject"
 	AnnotationType         = "karden.io/type"
@@ -13,15 +12,17 @@ const (
 	AnnotationRotationDays = "karden.io/rotation-days"
 )
 
-// defaultDBPort returns the well-known(잘 알려진) port for each DB type.
-func defaultDBPort(dbType domain.DBType) int {
+// defaultDBPort returns the well-known port for each DB type.
+func defaultDBPort(dbType workload.DBType) int {
 	switch dbType {
-	case domain.DBTypePostgres:
+	case workload.DBTypePostgres:
 		return 5432
-	case domain.DBTypeMySQL:
+	case workload.DBTypeMySQL:
 		return 3306
-	case domain.DBTypeMongoDB:
+	case workload.DBTypeMongoDB:
 		return 27017
+	case workload.DBTypeRedis:
+		return 6379
 	default:
 		return 0
 	}
