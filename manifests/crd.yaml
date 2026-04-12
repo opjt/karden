@@ -1,0 +1,66 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: kardensecrets.karden.io
+spec:
+  group: karden.io
+  scope: Namespaced
+  names:
+    plural: kardensecrets
+    singular: kardensecret
+    kind: KardenSecret
+    shortNames:
+      - ks
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Last Rotated
+          type: string
+          jsonPath: .status.lastRotatedAt
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [database, generated, external]
+                dbType:
+                  type: string
+                  enum: [mysql, postgres, mongodb, redis]
+                dbHost:
+                  type: string
+                dbPort:
+                  type: integer
+                rotationDays:
+                  type: integer
+                  default: 30
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Ready, Failed]
+                lastRotatedAt:
+                  type: string
+                nextRotationAt:
+                  type: string
+                message:
+                  type: string

@@ -1,0 +1,49 @@
+# KardenSecret — karden manages the postgres credentials
+apiVersion: karden.io/v1
+kind: KardenSecret
+metadata:
+  name: test-db-secret
+  namespace: default
+spec:
+  type: database
+  dbType: postgres
+  dbHost: test-db-svc.default.svc.cluster.local
+  rotationDays: 30
+---
+# Service — stable DNS for the postgres pod
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-db-svc
+  namespace: default
+spec:
+  selector:
+    app: test-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# Deployment — postgres pod, waits for Secret to exist before starting
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-db
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-db
+  template:
+    metadata:
+      labels:
+        app: test-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          envFrom:
+            - secretRef:
+                name: test-db-secret  # karden creates this automatically
+          ports:
+            - containerPort: 5432

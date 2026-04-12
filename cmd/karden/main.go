@@ -18,6 +18,7 @@ import (
 	"karden/internal/watcher"
 
 	k8sclient "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -61,6 +62,11 @@ func run(ctx context.Context, env config.Env) error {
 		return fmt.Errorf("failed to create clientset: %w", err)
 	}
 
+	dynClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
 	// SQLite
 	db, err := sqlite.Open(env.DBPath)
 	if err != nil {
@@ -74,7 +80,7 @@ func run(ctx context.Context, env config.Env) error {
 	secretSvc := workload.NewService(repo, store)
 
 	// watcher start
-	w := watcher.New(clientset, store, repo, auditRepo)
+	w := watcher.New(dynClient, store, repo, auditRepo)
 	go w.Start()
 
 	// HTTP server
