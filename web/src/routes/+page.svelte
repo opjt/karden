@@ -45,11 +45,11 @@
   }
 </script>
 
-<div class="bg-base-100 rounded-box overflow-hidden">
-  <div class="px-5 py-4 border-b border-base-200 flex items-center justify-between">
-    <h2 class="font-semibold text-sm">Secrets</h2>
-    <button class="btn btn-primary btn-sm gap-2">
-      <Plus size={13} />
+<div class="bg-base-250 rounded-box overflow-hidden border border-base-300">
+  <div class="px-4 py-2.5 border-b border-base-200 flex items-center justify-between">
+    <h2 class="font-semibold text-xs text-base-content/60 uppercase tracking-wide">Secrets</h2>
+    <button class="btn btn-primary btn-xs gap-1.5 shadow-none">
+      <Plus size={12} />
       Add Secret
     </button>
   </div>
@@ -63,7 +63,7 @@
     <div class="py-16 text-center text-error text-sm">{error}</div>
   {:else}
   <div class="overflow-x-auto">
-    <table class="table table-zebra text-sm">
+    <table class="table table-zebra table-sm">
       <thead>
         <tr class="text-xs text-base-content/50">
           <th>Name</th>
@@ -110,7 +110,7 @@
                 {#if rStatus === 'overdue' || rStatus === 'never'}
                   <AlertTriangle size={13} class="text-error" />
                 {/if}
-                <span class="badge {statusBadgeClass(rStatus)} badge-sm">
+                <span class="badge badge-outline {statusBadgeClass(rStatus)} badge-sm">
                   {statusLabel(secret.last_rotated_at, secret.rotation_days)}
                 </span>
               </div>
@@ -127,27 +127,27 @@
 <Drawer.Root bind:open={drawerOpen} direction="right">
   <Drawer.Content class="overflow-y-auto">
     {#if selected}
-      <Drawer.Header class="mb-4">
+      <Drawer.Header class="mb-3">
         <Drawer.Title class="font-mono text-sm font-semibold">
           {selected.name}
         </Drawer.Title>
-        <p class="text-xs text-base-content/40 mt-1 font-sans">
+        <p class="text-xs text-base-content/40 mt-0.5 font-sans">
           {selected.namespace} · {selected.db_type ?? selected.type}
         </p>
       </Drawer.Header>
 
-      <div class="space-y-4 px-10 pb-10">
+      <div class="space-y-3 px-5 pb-6">
 
         <!-- Data -->
         <div class="bg-base-200 rounded-lg divide-y divide-base-300">
-          <div class="px-5 py-3 flex items-center justify-between">
+          <div class="px-4 py-2 flex items-center justify-between">
             <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Data</span>
             <button class="btn btn-ghost btn-xs btn-circle" onclick={() => valueVisible = !valueVisible}>
               {#if valueVisible}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
             </button>
           </div>
           {#each Object.entries(selected.data ?? {}) as [key, value]}
-            <div class="px-5 py-3 flex flex-col gap-0.5">
+            <div class="px-4 py-2 flex flex-col gap-0.5">
               <span class="font-mono text-xs text-base-content/40">{key}</span>
               <span class="font-mono text-sm text-base-content/80 truncate">
                 {valueVisible ? value : '••••••••••••••••'}
@@ -158,13 +158,13 @@
 
         <!-- Rotation -->
         <div class="bg-base-200 rounded-lg divide-y divide-base-300">
-          <div class="px-5 py-3 flex items-center justify-between">
+          <div class="px-4 py-2 flex items-center justify-between">
             <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Rotation</span>
             {#if selected.type === 'database'}
               <button class="btn btn-ghost btn-xs gap-1"><RotateCw size={11} />Rotate now</button>
             {/if}
           </div>
-          <div class="px-5 py-4 grid grid-cols-2 gap-6 text-sm">
+          <div class="px-4 py-3 grid grid-cols-2 gap-4 text-sm">
             <div>
               <div class="text-xs text-base-content/40 mb-1">Last rotated</div>
               <div>{formatDate(selected.last_rotated_at)}</div>
@@ -178,12 +178,12 @@
 
         <!-- Used by -->
         <div class="bg-base-200 rounded-lg divide-y divide-base-300">
-          <div class="px-5 py-3">
+          <div class="px-4 py-2">
             <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Used by</span>
           </div>
           <ul class="divide-y divide-base-300">
             {#each selected.pods as pod}
-              <li class="flex items-center gap-3 px-5 py-3">
+              <li class="flex items-center gap-2.5 px-4 py-2">
                 <Box size={13} class="text-base-content/40" />
                 <span class="font-mono text-sm">{pod}</span>
               </li>
@@ -199,12 +199,12 @@
         {:then logs}
           {#if logs.length > 0}
             <div class="bg-base-200 rounded-lg divide-y divide-base-300">
-              <div class="px-5 py-3">
+              <div class="px-4 py-2">
                 <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">History</span>
               </div>
               <ul class="divide-y divide-base-300">
                 {#each logs as entry}
-                  <li class="flex items-center gap-3 px-5 py-3">
+                  <li class="flex items-center gap-2.5 px-4 py-2">
                     <Clock size={12} class="text-base-content/30 shrink-0" />
                     <span class="text-xs text-base-content/50 w-32 shrink-0">{formatDate(entry.created_at)}</span>
                     <span class="font-mono text-xs text-base-content/60">{entry.actor}</span>

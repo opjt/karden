@@ -1,14 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { Moon, ScrollText, Settings, Sun } from '@lucide/svelte';
+  import { ScrollText, Settings } from '@lucide/svelte';
   import '../app.css';
-
-  let theme = $state<'karden' | 'karden-dark'>('karden')
-
-  function toggleTheme() {
-    theme = theme === 'karden' ? 'karden-dark' : 'karden'
-    document.documentElement.setAttribute('data-theme', theme)
-  }
 
   let { children } = $props()
 </script>
@@ -16,8 +9,8 @@
 <div class="min-h-screen flex flex-col bg-base-200">
 
   <!-- Topbar -->
-  <header class="bg-base-100 border-b border-base-200 sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center gap-6">
+  <header class="bg-base-100 border-b border-base-300 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 h-10 flex items-center gap-4">
 
       <!-- Logo -->
       <a href="/" class="flex items-center gap-2 shrink-0">
@@ -49,20 +42,8 @@
         </a>
       </nav>
 
-      <!-- Right: theme toggle + settings -->
+      <!-- Right: settings -->
       <div class="flex items-center gap-1">
-        <button
-          class="btn btn-ghost btn-sm btn-circle"
-          onclick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {#if theme === 'karden'}
-            <Moon size={15} />
-          {:else}
-            <Sun size={15} />
-          {/if}
-        </button>
-
         <a
           href="/settings"
           class="btn btn-ghost btn-sm btn-circle {$page.url.pathname === '/settings' ? 'text-primary' : ''}"
@@ -76,7 +57,7 @@
   </header>
 
   <!-- Page content -->
-  <main class="flex-1 p-6 max-w-6xl w-full mx-auto">
+  <main class="flex-1 p-4 max-w-6xl w-full mx-auto">
     {@render children()}
   </main>
 
