@@ -1,7 +1,8 @@
 <script lang="ts">
   import { api, type Secret } from '$lib/api'
   import { daysUntilRotation, rotationStatus, formatDate } from '$lib/mock'
-  import { Database, ExternalLink, RefreshCw, AlertTriangle, Eye, EyeOff, RotateCw, Clock, Box, Plus, Loader } from '@lucide/svelte'
+  import { Database, ExternalLink, RefreshCw, AlertTriangle, Eye, EyeOff, RotateCw, Clock, Box, Plus, Loader, Filter, X } from '@lucide/svelte'
+  import { slide } from 'svelte/transition'
   import * as Drawer from '$lib/components/ui/drawer/index.js'
 
   let secrets = $state<Secret[]>([])
@@ -32,6 +33,33 @@
   function startEdit() { editMode = true; editValue = '' }
   function cancelEdit() { editMode = false; editValue = '' }
 
+  // ── Filter state ─────────────────────────────────────────────
+  let filterOpen = $state(false)
+  let filterName = $state('')
+  let filterNamespace = $state('')
+  let filterType = $state<string>('')
+  let filterStatus = $state<string>('')
+
+  let activeFilterCount = $derived(
+    [filterName, filterNamespace, filterType, filterStatus].filter(Boolean).length
+  )
+
+  function clearFilters() {
+    filterName = ''
+    filterNamespace = ''
+    filterType = ''
+    filterStatus = ''
+  }
+
+  let filteredSecrets = $derived(secrets.filter(s => {
+    if (filterName && !s.name.toLowerCase().includes(filterName.toLowerCase())) return false
+    if (filterNamespace && !s.namespace.toLowerCase().includes(filterNamespace.toLowerCase())) return false
+    if (filterType && s.type !== filterType) return false
+    if (filterStatus && rotationStatus(s.last_rotated_at, s.rotation_days) !== filterStatus) return false
+    return true
+  }))
+
+  // ── Helpers ──────────────────────────────────────────────────
   function statusBadgeClass(s: ReturnType<typeof rotationStatus>) {
     return { ok: 'badge-success', soon: 'badge-warning', overdue: 'badge-error', never: 'badge-error' }[s]
   }
@@ -45,14 +73,82 @@
   }
 </script>
 
-<div class="bg-base-250 rounded-box overflow-hidden border border-base-300">
-  <div class="px-4 py-2.5 border-b border-base-200 flex items-center justify-between">
+<div class="bg-base-200 rounded-box overflow-hidden border border-base-300">
+
+  <!-- Header -->
+  <div class="px-4 py-2.5 border-b border-base-300 bg-base-300 flex items-center justify-between">
     <h2 class="font-semibold text-xs text-base-content/60 uppercase tracking-wide">Secrets</h2>
-    <button class="btn btn-primary btn-xs gap-1.5 shadow-none">
-      <Plus size={12} />
-      Add Secret
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        class="btn btn-ghost btn-xs gap-1.5 shadow-none {activeFilterCount > 0 ? 'text-primary' : ''}"
+        onclick={() => filterOpen = !filterOpen}
+      >
+        <Filter size={12} />
+        Filter
+        {#if activeFilterCount > 0}
+          <span class="badge badge-primary badge-xs">{activeFilterCount}</span>
+        {/if}
+      </button>
+      <button class="btn btn-primary btn-xs gap-1.5 shadow-none">
+        <Plus size={12} />
+        Add Secret
+      </button>
+    </div>
   </div>
+
+  <!-- Filter panel -->
+  {#if filterOpen}
+    <div transition:slide={{ duration: 150 }} class="px-4 py-3 border-b border-base-200 flex items-end gap-3 flex-wrap bg-base-200">
+      <!-- Name -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-base-content/50">Name</label>
+        <input
+          class="input input-xs w-36 bg-base-300 border-base-300 font-mono"
+          placeholder="search..."
+          bind:value={filterName}
+        />
+      </div>
+
+      <!-- Namespace -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-base-content/50">Namespace</label>
+        <input
+          class="input input-xs w-28 bg-base-300 border-base-300 font-mono"
+          placeholder="search..."
+          bind:value={filterNamespace}
+        />
+      </div>
+
+      <!-- Type -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-base-content/50">Type</label>
+        <select class="select select-xs w-32 bg-base-300 border-base-300" bind:value={filterType}>
+          <option value="">All</option>
+          <option value="database">database</option>
+          <option value="generated">generated</option>
+          <option value="external">external</option>
+        </select>
+      </div>
+
+      <!-- Status -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-base-content/50">Status</label>
+        <select class="select select-xs w-32 bg-base-300 border-base-300" bind:value={filterStatus}>
+          <option value="">All</option>
+          <option value="ok">ok</option>
+          <option value="soon">soon</option>
+          <option value="overdue">overdue</option>
+          <option value="never">never rotated</option>
+        </select>
+      </div>
+
+      {#if activeFilterCount > 0}
+        <button class="btn btn-ghost btn-xs gap-1 text-base-content/40 mb-0.5" onclick={clearFilters}>
+          <X size={11} /> Clear
+        </button>
+      {/if}
+    </div>
+  {/if}
 
   {#if loading}
     <div class="flex items-center justify-center gap-2 py-16 text-base-content/40 text-sm">
@@ -75,7 +171,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each secrets as secret}
+        {#each filteredSecrets as secret}
           {@const rStatus = rotationStatus(secret.last_rotated_at, secret.rotation_days)}
           <tr
             class="cursor-pointer hover"
@@ -117,6 +213,11 @@
             </td>
           </tr>
         {/each}
+        {#if filteredSecrets.length === 0}
+          <tr>
+            <td colspan="6" class="text-center py-10 text-base-content/30 text-xs">No secrets match the current filters.</td>
+          </tr>
+        {/if}
       </tbody>
     </table>
   </div>
